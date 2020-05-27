@@ -36,9 +36,7 @@ from __future__ import print_function
 import logging
 import os
 import time
-import math
 from string import Template
-import numpy as np
 
 # Third-Party Library Imports
 import click
@@ -73,6 +71,7 @@ from scenedetect.platform import check_opencv_ffmpeg_dll
 
 
 from scenedetect.frame_timecode import FrameTimecode
+
 
 def get_plural(val_list):
     """ Get Plural: Helper function to return 's' if a list has more than one (1)
@@ -156,7 +155,7 @@ class CliContext(object):
     def _generate_images(self, scene_list, video_name,
                          image_name_template='$VIDEO_NAME-Scene-$SCENE_NUMBER-$IMAGE_NUMBER',
                          output_dir=None):
-        # type: (List[Tuple[FrameTimecode, FrameTimecode]) -> None
+        # type: (List[Tuple[FrameTimecode, FrameTimecode]]) -> None
 
         if not scene_list:
             return
@@ -186,33 +185,17 @@ class CliContext(object):
 
         filename_template = Template(image_name_template)
 
-
-        scene_num_format = '%0'
-        scene_num_format += str(max(3, math.floor(math.log(len(scene_list), 10)) + 1)) + 'd'
-        image_num_format = '%0'
-        image_num_format += str(math.floor(math.log(self.num_images, 10)) + 2) + 'd'
-
-        timecode_list = dict()
+        scene_num_format = '%0' + str(max(3, len(str(len(scene_list))) + 1)) + 'd'
+        image_num_format = '%0' + str(2 + len(str(self.num_images))) + 'd'
 
         fps = scene_list[0][0].framerate
 
         timecode_list = [
             [
-                FrameTimecode(int(f), fps=fps) for f in [
-                    # middle frames
-                    a[len(a)//2] if (0 < j < self.num_images-1) or self.num_images == 1
-
-                    # first frame
-                    else min(a[0] + self.image_frame_margin, a[-1]) if j == 0
-
-                    # last frame
-                    else max(a[-1] - self.image_frame_margin, a[0])
-
-                    # for each evenly-split array of frames in the scene list
-                    for j, a in enumerate(np.array_split(r, self.num_images))
-                ]
+                FrameTimecode(int(r[idx]), fps=fps)
+                for idx in [round(x*(len(r)-1)/(self.num_images-1)) for x in range(self.num_images)]
             ]
-            for i, r in enumerate([
+            for r in ([
                     # pad ranges to number of images
                     r
                     if r.stop-r.start >= self.num_images
@@ -292,7 +275,6 @@ class CliContext(object):
                     raise click.BadParameter(
                         'framerate differs between given stats file and input video(s).',
                         param_hint='input stats file')
-
 
     def process_input(self):
         # type: () -> None
@@ -382,7 +364,6 @@ class CliContext(object):
         start_time.get_frames(), start_time.get_timecode(),
         end_time.get_frames(), end_time.get_timecode())
      for i, (start_time, end_time) in enumerate(scene_list)]))
-
 
         if cut_list:
             logging.info('Comma-separated timecode list:\n  %s',
